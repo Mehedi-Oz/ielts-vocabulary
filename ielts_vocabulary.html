@@ -1,0 +1,339 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="light">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="A comprehensive vocabulary learning platform. Organize, search, filter, and practice essential academic vocabulary, expressions, and language patterns.">
+  <title>Vocabulary Learning Platform</title>
+
+  <!-- Styling -->
+  <link rel="stylesheet" href="css/styles.css">
+</head>
+<body>
+
+  <!-- Mobile Top Header Bar -->
+  <header class="mobile-top-header">
+    <button id="mobile-menu-toggle" class="btn-menu-toggle" aria-label="Toggle Navigation Menu">☰ Menu</button>
+    <div class="sidebar-brand" style="padding: 0; border: none;">
+      <div class="sidebar-logo">I</div>
+      <h2 style="font-size: 16px">Vocab<span>Hub</span></h2>
+    </div>
+    <button id="theme-toggle-mobile" class="btn-icon" onclick="toggleTheme()" aria-label="Toggle Light/Dark Theme">🌙</button>
+  </header>
+
+  <div class="dashboard-container">
+
+    <!-- Collapsible Sidebar Drawer / Desktop Sidebar -->
+    <aside class="sidebar">
+      <div class="sidebar-brand">
+        <div class="sidebar-logo">I</div>
+        <h2>Vocab<span>Hub</span></h2>
+      </div>
+
+      <nav class="sidebar-menu">
+        <!-- Categories Section -->
+        <div class="menu-group">
+          <div class="menu-group-title">Study Categories</div>
+          <ul class="menu-list">
+            <li class="menu-item active" data-category="" data-subcategory="" data-show="all">
+              <span class="menu-item-icon">📚</span>
+              <span>All Items</span>
+              <span class="menu-item-count" id="count-all">382</span>
+            </li>
+            <li class="menu-item" data-category="Vocabulary" data-subcategory="" data-show="all">
+              <span class="menu-item-icon">📖</span>
+              <span>Core Vocabulary</span>
+              <span class="menu-item-count" id="count-vocab">0</span>
+            </li>
+            <li class="menu-item" data-category="Synonyms" data-subcategory="" data-show="all">
+              <span class="menu-item-icon">🔄</span>
+              <span>Word Alternatives</span>
+              <span class="menu-item-count" id="count-synonyms">0</span>
+            </li>
+            <li class="menu-item" data-category="Idioms & Phrases" data-subcategory="" data-show="all">
+              <span class="menu-item-icon">💬</span>
+              <span>Expressions & Idioms</span>
+              <span class="menu-item-count" id="count-idioms">0</span>
+            </li>
+            <li class="menu-item" data-category="Topic-Based Vocabulary" data-subcategory="" data-show="all">
+              <span class="menu-item-icon">🏷️</span>
+              <span>Thematic Vocabulary</span>
+              <span class="menu-item-count" id="count-topics">0</span>
+            </li>
+          </ul>
+        </div>
+
+        <!-- Filter Quick-Links Section -->
+        <div class="menu-group">
+          <div class="menu-group-title">My Progress</div>
+          <ul class="menu-list">
+            <li class="menu-item" data-category="" data-subcategory="" data-show="bookmarks">
+              <span class="menu-item-icon">⭐</span>
+              <span>Bookmarked Words</span>
+              <span class="menu-item-count" id="count-bookmarks">0</span>
+            </li>
+            <li class="menu-item" data-category="" data-subcategory="" data-show="unmastered">
+              <span class="menu-item-icon">⏰</span>
+              <span>Unmastered Review</span>
+            </li>
+            <li class="menu-item" data-category="" data-subcategory="" data-show="mastered">
+              <span class="menu-item-icon">✅</span>
+              <span>Mastered Words</span>
+            </li>
+          </ul>
+        </div>
+
+        <!-- Interactive Progress widget -->
+        <div class="user-progress-widget">
+          <div class="progress-header">
+            <span>Overall Mastery</span>
+            <span id="sidebar-progress-pct">0%</span>
+          </div>
+          <div class="progress-bar-container">
+            <div id="sidebar-progress-fill" class="progress-bar-fill"></div>
+          </div>
+          <div class="progress-stats-row">
+            <div class="progress-stats-col">
+              <span id="sidebar-progress-count">0</span> Mastered
+            </div>
+            <div class="progress-stats-col">
+              of <span id="sidebar-progress-total">382</span> Words
+            </div>
+          </div>
+        </div>
+      </nav>
+    </aside>
+
+    <!-- Main Content Area -->
+    <main class="main-content">
+
+      <!-- Top Navbar Navigation -->
+      <header class="navbar">
+        <div class="nav-title">Vocabulary Learning Dashboard</div>
+        <div class="navbar-actions">
+          <button id="theme-toggle" class="btn-icon" aria-label="Toggle theme">🌙</button>
+          <button id="btn-add-word" class="btn-primary" style="margin-right: 10px;">
+            <span>➕</span> Add New Word
+          </button>
+          <button id="btn-practice" class="btn-primary">
+            <span>🧠</span> Practice
+          </button>
+        </div>
+      </header>
+
+      <!-- Welcome Hero Info Section -->
+      <section class="hero-section">
+        <div class="hero-text">
+          <h1>Build Your Vocabulary Foundation</h1>
+          <p>Develop comprehensive language skills with carefully curated vocabulary, academic expressions, and contextual examples. Explore organized content across multiple categories to enhance your communication proficiency.</p>
+        </div>
+
+        <!-- Mini Stats Grid -->
+        <div class="stats-grid">
+          <div class="stat-card">
+            <div class="stat-icon-wrapper">📊</div>
+            <div class="stat-info">
+              <h3 id="stat-total-words">382</h3>
+              <p>Total Words</p>
+            </div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-icon-wrapper">🔄</div>
+            <div class="stat-info">
+              <h3 id="stat-synonyms">0</h3>
+              <p>Word Alternatives</p>
+            </div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-icon-wrapper">💬</div>
+            <div class="stat-info">
+              <h3 id="stat-idioms">0</h3>
+              <p>Expressions</p>
+            </div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-icon-wrapper">🏷️</div>
+            <div class="stat-info">
+              <h3 id="stat-categories">0</h3>
+              <p>Topic Areas</p>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- Control Panel (Search, Filters, Sort, Alphabet Nav) -->
+      <section class="content-controls">
+        <div class="filter-row">
+          <!-- Live Search Bar -->
+          <div class="search-bar-wrapper">
+            <span class="search-icon">🔍</span>
+            <input type="text" id="search-vocab" class="search-input" placeholder="Search words, meanings, or expressions...">
+          </div>
+
+          <!-- Difficulty Selector Filter -->
+          <div class="select-wrapper">
+            <select id="filter-difficulty" class="select-filter" aria-label="Select Difficulty Level">
+              <option value="">All Difficulties</option>
+              <option value="Basic">Foundation Level</option>
+              <option value="Intermediate">Intermediate Level</option>
+              <option value="Advanced">Advanced Level</option>
+            </select>
+          </div>
+
+          <!-- Dynamic Subcategory Selector Filter -->
+          <div class="select-wrapper">
+            <select id="filter-subcategory" class="select-filter" aria-label="Select Subcategory Filter">
+              <option value="">All Subcategories</option>
+            </select>
+          </div>
+
+          <!-- Sorting drop down -->
+          <div class="select-wrapper">
+            <select id="sort-vocab" class="select-filter" aria-label="Sort Order selection">
+              <option value="alpha-asc">Alphabetical (A to Z)</option>
+              <option value="alpha-desc">Alphabetical (Z to A)</option>
+              <option value="difficulty-asc">Difficulty (Easy first)</option>
+              <option value="difficulty-desc">Difficulty (Hard first)</option>
+            </select>
+          </div>
+
+          <!-- Layout Grid/List View Toggles -->
+          <div class="view-toggle-group">
+            <button id="btn-view-grid" class="btn-toggle active" title="Grid View" aria-label="Grid View">🎛️</button>
+            <button id="btn-view-list" class="btn-toggle" title="List View" aria-label="List View">☰</button>
+          </div>
+        </div>
+
+        <!-- Sticky Alphabet Nav Scroller -->
+        <div id="alphabet-scroller" class="alphabet-scroller">
+          <!-- Injected dynamically via app.js -->
+        </div>
+
+        <div class="active-filters-bar">
+          <span id="stat-showing-count" style="font-size: 13px; font-weight: 600; color: var(--text-secondary)">Showing 0 of 0 Vocabulary Items</span>
+        </div>
+      </section>
+
+      <!-- Vocabulary Card Grid container -->
+      <section class="cards-section">
+        <div id="cards-grid" class="cards-grid">
+          <!-- Injected dynamically via app.js -->
+        </div>
+      </section>
+
+    </main>
+  </div>
+
+  <!-- Add Word Modal -->
+  <div id="add-word-modal" class="modal-overlay" role="dialog" aria-modal="true" style="display: none;">
+    <div class="modal-container" style="max-width: 600px;">
+      <div class="modal-header">
+        <h3 class="modal-title">➕ Add New Word</h3>
+        <button class="btn-close-modal" onclick="closeAddWordModal()" aria-label="Close">✕</button>
+      </div>
+
+      <form id="add-word-form" style="padding: 20px;">
+        <div style="margin-bottom: 15px;">
+          <label style="display: block; margin-bottom: 5px; font-weight: 600;">Word *</label>
+          <input type="text" id="input-word" required style="width: 100%; padding: 8px; border: 1px solid #ddd; border-radius: 4px;" placeholder="Enter the word">
+        </div>
+
+        <div style="margin-bottom: 15px;">
+          <label style="display: block; margin-bottom: 5px; font-weight: 600;">Meaning *</label>
+          <textarea id="input-meaning" required rows="2" style="width: 100%; padding: 8px; border: 1px solid #ddd; border-radius: 4px;" placeholder="Definition or meaning"></textarea>
+        </div>
+
+        <div style="margin-bottom: 15px;">
+          <label style="display: block; margin-bottom: 5px; font-weight: 600;">Synonyms (comma-separated)</label>
+          <input type="text" id="input-synonyms" style="width: 100%; padding: 8px; border: 1px solid #ddd; border-radius: 4px;" placeholder="e.g., happy, joyful, cheerful">
+        </div>
+
+        <div style="margin-bottom: 15px;">
+          <label style="display: block; margin-bottom: 5px; font-weight: 600;">Example Sentence</label>
+          <textarea id="input-example" rows="2" style="width: 100%; padding: 8px; border: 1px solid #ddd; border-radius: 4px;" placeholder="Example usage"></textarea>
+        </div>
+
+        <div style="margin-bottom: 15px;">
+          <label style="display: block; margin-bottom: 5px; font-weight: 600;">IELTS Example</label>
+          <textarea id="input-ielts-example" rows="2" style="width: 100%; padding: 8px; border: 1px solid #ddd; border-radius: 4px;" placeholder="IELTS context example"></textarea>
+        </div>
+
+        <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 10px; margin-bottom: 15px;">
+          <div>
+            <label style="display: block; margin-bottom: 5px; font-weight: 600;">Category *</label>
+            <select id="input-category" required style="width: 100%; padding: 8px; border: 1px solid #ddd; border-radius: 4px;">
+              <option value="">Select...</option>
+              <option value="Vocabulary">Vocabulary</option>
+              <option value="Synonyms">Synonyms</option>
+              <option value="Idioms & Phrases">Idioms & Phrases</option>
+              <option value="Topic-Based Vocabulary">Topic-Based Vocabulary</option>
+            </select>
+          </div>
+
+          <div>
+            <label style="display: block; margin-bottom: 5px; font-weight: 600;">Subcategory</label>
+            <input type="text" id="input-subcategory" style="width: 100%; padding: 8px; border: 1px solid #ddd; border-radius: 4px;" placeholder="e.g., Education">
+          </div>
+
+          <div>
+            <label style="display: block; margin-bottom: 5px; font-weight: 600;">Difficulty *</label>
+            <select id="input-difficulty" required style="width: 100%; padding: 8px; border: 1px solid #ddd; border-radius: 4px;">
+              <option value="">Select...</option>
+              <option value="Basic">Basic</option>
+              <option value="Intermediate">Intermediate</option>
+              <option value="Advanced">Advanced</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="modal-actions" style="display: flex; gap: 10px; justify-content: flex-end;">
+          <button type="button" class="btn-secondary" onclick="closeAddWordModal()">Cancel</button>
+          <button type="submit" class="btn-primary">💾 Save Word</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Flashcard Practice Interactive Modal Overlay -->
+  <div id="practice-modal" class="modal-overlay" role="dialog" aria-modal="true" aria-labelledby="modal-title-text">
+    <div class="modal-container">
+      <div class="modal-header">
+        <h3 id="modal-title-text" class="modal-title">🧠 Practice Session</h3>
+        <button class="btn-close-modal" onclick="closePracticeMode()" aria-label="Close Practice Session">✕</button>
+      </div>
+
+      <!-- Flippable Card Element -->
+      <div class="flashcard-wrapper" onclick="flipFlashcard()">
+        <div id="practice-card" class="flashcard">
+          <!-- Front Face -->
+          <div class="flashcard-face flashcard-front" id="flashcard-front-content">
+            <!-- Injected dynamically -->
+          </div>
+          <!-- Back Face -->
+          <div class="flashcard-face flashcard-back" id="flashcard-back-content">
+            <!-- Injected dynamically -->
+          </div>
+        </div>
+      </div>
+
+      <!-- Modal Navigation Controls -->
+      <div class="modal-actions">
+        <div id="flashcard-index-display" class="flashcard-index">0 / 0</div>
+        <button id="btn-practice-master" class="btn-secondary" onclick="handlePracticeMaster()">
+          ✅ Mastered Word
+        </button>
+        <button id="btn-practice-next" class="btn-primary" onclick="handlePracticeNext()">
+          Next Card ➔
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- JavaScript Resource Files -->
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="js/supabase.js"></script>
+  <script src="js/db-helpers.js"></script>
+  <!-- <script src="js/data.js"></script> -->
+  <script src="js/app-supabase.js"></script>
+</body>
+</html>
