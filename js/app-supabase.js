@@ -197,19 +197,19 @@ function populateSubcategoryDropdown(category) {
   
   let subcategories = [];
   if (category === 'Vocabulary') {
-    subcategories = ['Core Vocabulary', 'Academic Vocabulary', 'Advanced Vocabulary'];
+    subcategories = ['Academic Vocabulary', 'Advanced Vocabulary', 'Essential IELTS Vocabulary'];
   } else if (category === 'Synonyms') {
-    subcategories = ['Common Synonyms', 'Academic Synonyms', 'Formal Alternatives'];
+    subcategories = ['Common IELTS Synonyms', 'Writing Task 2 Synonyms'];
   } else if (category === 'Idioms & Phrases') {
-    subcategories = ['Common Expressions', 'Professional Idioms', 'Useful Phrases'];
+    subcategories = ['Common IELTS Idioms', 'Essential Idioms', 'IELTS Speaking Idioms', 'Phrasal Verbs', 'Speaking Idioms', 'Useful Expressions'];
   } else if (category === 'Topic-Based Vocabulary') {
-    subcategories = ['Education', 'Environment', 'Technology', 'Health', 'Business', 'Government', 'Society', 'Science', 'Media', 'Culture'];
+    subcategories = ['Education', 'Environment', 'Technology', 'Health', 'Business', 'Government', 'Society', 'Science', 'Media', 'Culture', 'Crime', 'Transportation'];
   } else {
     subcategories = [
-      'Core Vocabulary', 'Academic Vocabulary', 'Advanced Vocabulary',
-      'Common Synonyms', 'Academic Synonyms', 'Formal Alternatives',
-      'Common Expressions', 'Professional Idioms', 'Useful Phrases',
-      'Education', 'Environment', 'Technology', 'Health', 'Business', 'Government', 'Society', 'Science', 'Media', 'Culture'
+      'Academic Vocabulary', 'Advanced Vocabulary', 'Essential IELTS Vocabulary',
+      'Common IELTS Synonyms', 'Writing Task 2 Synonyms',
+      'Common IELTS Idioms', 'Essential Idioms', 'IELTS Speaking Idioms', 'Phrasal Verbs', 'Speaking Idioms', 'Useful Expressions',
+      'Education', 'Environment', 'Technology', 'Health', 'Business', 'Government', 'Society', 'Science', 'Media', 'Culture', 'Crime', 'Transportation'
     ];
   }
   
