@@ -820,7 +820,8 @@ async function handleAddWord(event) {
     ielts_example: ieltsExample || null,
     category,
     subcategory: subcategory || null,
-    difficulty
+    difficulty,
+    approved: true
   };
 
   try {
