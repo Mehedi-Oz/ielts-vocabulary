@@ -1,6 +1,27 @@
 // Vocabulary Learning Dashboard Logic - Supabase Version
 
-// State Management
+function debounce(fn, ms) {
+  let timer;
+  return (...args) => { clearTimeout(timer); timer = setTimeout(() => fn(...args), ms); };
+}
+
+function toast(msg, type) {
+  const existing = document.querySelector('.toast-container');
+  if (existing) existing.remove();
+
+  const container = document.createElement('div');
+  container.className = 'toast-container';
+  container.innerHTML = `<div class="toast toast--${type || 'info'}"><span>${msg}</span></div>`;
+  document.body.appendChild(container);
+  requestAnimationFrame(() => container.querySelector('.toast').classList.add('toast--show'));
+
+  setTimeout(() => {
+    const t = container.querySelector('.toast');
+    if (t) t.classList.remove('toast--show');
+    setTimeout(() => container.remove(), 250);
+  }, 2500);
+}
+
 const state = {
   words: [],
   filteredWords: [],
@@ -15,7 +36,7 @@ const state = {
     showOnly: 'all'
   },
   sorting: 'alpha-asc',
-  viewMode: 'grid',
+  _firstRender: true,
   visibleCount: 60,
   flashcards: {
     queue: [],
@@ -24,15 +45,13 @@ const state = {
   }
 };
 
-// Initialize App
 document.addEventListener('DOMContentLoaded', async () => {
   loadUserData();
   initTheme();
-  
-  // Load words from Supabase
+  showLoading(true);
   state.words = await loadWords();
-  
-  initSidebar();
+  showLoading(false);
+  initCategoryTabs();
   initFilters();
   initStats();
   initAlphabetScroller();
@@ -40,14 +59,12 @@ document.addEventListener('DOMContentLoaded', async () => {
   applyFiltersAndRender();
 });
 
-// Load Bookmarks and Mastered words from localStorage
 function loadUserData() {
   try {
     const savedBookmarks = localStorage.getItem('vocab_bookmarks');
     if (savedBookmarks) {
       JSON.parse(savedBookmarks).forEach(w => state.bookmarks.add(w.toLowerCase()));
     }
-    
     const savedMastered = localStorage.getItem('vocab_mastered');
     if (savedMastered) {
       JSON.parse(savedMastered).forEach(w => state.mastered.add(w.toLowerCase()));
@@ -57,22 +74,20 @@ function loadUserData() {
   }
 }
 
-// Save Bookmarks and Mastered words to localStorage
 function saveUserData() {
   try {
     localStorage.setItem('vocab_bookmarks', JSON.stringify(Array.from(state.bookmarks)));
     localStorage.setItem('vocab_mastered', JSON.stringify(Array.from(state.mastered)));
   } catch (e) {
     console.error("Error saving user progress data:", e);
+    toast('Failed to save progress', 'error');
   }
 }
 
-// Light / Dark Theme Support
 function initTheme() {
   const systemDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
   const savedTheme = localStorage.getItem('vocab_theme');
   const activeTheme = savedTheme || (systemDark ? 'dark' : 'light');
-  
   document.documentElement.setAttribute('data-theme', activeTheme);
   updateThemeIcon(activeTheme);
 }
@@ -80,20 +95,16 @@ function initTheme() {
 function toggleTheme() {
   const currentTheme = document.documentElement.getAttribute('data-theme');
   const newTheme = currentTheme === 'dark' ? 'light' : 'dark';
-  
   document.documentElement.setAttribute('data-theme', newTheme);
   localStorage.setItem('vocab_theme', newTheme);
   updateThemeIcon(newTheme);
 }
 
 function updateThemeIcon(theme) {
-  const themeBtn = document.getElementById('theme-toggle');
-  if (themeBtn) {
-    themeBtn.innerHTML = theme === 'dark' ? '☀️' : '🌙';
-  }
+  const btn = document.getElementById('theme-toggle');
+  if (btn) btn.innerHTML = theme === 'dark' ? '☀️' : '🌙';
 }
 
-// Calculate and Render Dashboard Statistics
 function initStats() {
   const stats = {
     total: state.words.length,
@@ -105,11 +116,13 @@ function initStats() {
     mastered: state.mastered.size
   };
 
-  document.getElementById('stat-total-words').textContent = stats.total;
-  document.getElementById('stat-synonyms').textContent = stats.synonyms;
-  document.getElementById('stat-idioms').textContent = stats.idioms;
-  document.getElementById('stat-categories').textContent = stats.topics;
-  
+  document.getElementById('count-all').textContent = stats.total;
+  document.getElementById('count-vocab').textContent = stats.vocabulary;
+  document.getElementById('count-synonyms').textContent = stats.synonyms;
+  document.getElementById('count-idioms').textContent = stats.idioms;
+  document.getElementById('count-topics').textContent = stats.topics;
+  document.getElementById('count-bookmarks').textContent = stats.bookmarks;
+
   updateProgressBar();
 }
 
@@ -117,35 +130,28 @@ function updateProgressBar() {
   const total = state.words.length;
   const mastered = state.mastered.size;
   const pct = total > 0 ? Math.round((mastered / total) * 100) : 0;
-  
-  const fill = document.getElementById('sidebar-progress-fill');
+
+  const fill = document.getElementById('progress-chip-fill');
   if (fill) fill.style.width = `${pct}%`;
-  
-  const pctText = document.getElementById('sidebar-progress-pct');
-  if (pctText) pctText.textContent = `${pct}%`;
-  
-  const countText = document.getElementById('sidebar-progress-count');
-  if (countText) countText.textContent = mastered;
-  
-  const totalText = document.getElementById('sidebar-progress-total');
-  if (totalText) totalText.textContent = total;
+
+  const text = document.getElementById('progress-chip-text');
+  if (text) text.textContent = `${pct}% mastered`;
 }
 
-// Generate the A-Z Alphabet Scrollbar
 function initAlphabetScroller() {
   const container = document.getElementById('alphabet-scroller');
   if (!container) return;
-  
-  let html = `<div class="alphabet-letter active" data-letter="">ALL</div>`;
+
+  let html = `<div class="alpha-letter active" data-letter="">ALL</div>`;
   for (let i = 65; i <= 90; i++) {
     const letter = String.fromCharCode(i);
-    html += `<div class="alphabet-letter" data-letter="${letter}">${letter}</div>`;
+    html += `<div class="alpha-letter" data-letter="${letter}">${letter}</div>`;
   }
   container.innerHTML = html;
-  
-  container.querySelectorAll('.alphabet-letter').forEach(el => {
+
+  container.querySelectorAll('.alpha-letter').forEach(el => {
     el.addEventListener('click', () => {
-      container.querySelectorAll('.alphabet-letter').forEach(l => l.classList.remove('active'));
+      container.querySelectorAll('.alpha-letter').forEach(l => l.classList.remove('active'));
       el.classList.add('active');
       state.filters.letter = el.dataset.letter;
       applyFiltersAndRender();
@@ -153,34 +159,26 @@ function initAlphabetScroller() {
   });
 }
 
-// Set up Collapsible lists or sidebar selection events
-function initSidebar() {
-  const sidebarItems = document.querySelectorAll('.sidebar-menu .menu-item');
-  sidebarItems.forEach(item => {
-    item.addEventListener('click', () => {
-      sidebarItems.forEach(el => el.classList.remove('active'));
-      item.classList.add('active');
-      
-      const category = item.dataset.category || '';
-      const subcategory = item.dataset.subcategory || '';
-      const showOnly = item.dataset.show || 'all';
-      
-      state.filters.category = category;
-      state.filters.subcategory = subcategory;
-      state.filters.showOnly = showOnly;
-      
-      populateSubcategoryDropdown(category);
+function initCategoryTabs() {
+  const tabs = document.querySelectorAll('.cat-tab');
+  tabs.forEach(tab => {
+    tab.addEventListener('click', () => {
+      tabs.forEach(t => t.classList.remove('active'));
+      tab.classList.add('active');
+
+      state.filters.category = tab.dataset.category || '';
+      state.filters.subcategory = tab.dataset.subcategory || '';
+      state.filters.showOnly = tab.dataset.show || 'all';
+
+      populateSubcategoryDropdown(state.filters.category);
       resetLetterFilter();
       applyFiltersAndRender();
-      
-      document.querySelector('.sidebar').classList.remove('active');
     });
   });
-  
-  updateMenuCounts();
 }
 
 function updateMenuCounts() {
+  document.getElementById('count-all').textContent = state.words.length;
   document.getElementById('count-vocab').textContent = state.words.filter(w => w.category === 'Vocabulary').length;
   document.getElementById('count-synonyms').textContent = state.words.filter(w => w.category === 'Synonyms').length;
   document.getElementById('count-idioms').textContent = state.words.filter(w => w.category === 'Idioms & Phrases').length;
@@ -188,67 +186,68 @@ function updateMenuCounts() {
   document.getElementById('count-bookmarks').textContent = state.bookmarks.size;
 }
 
-// Populate Subcategory dropdown filters based on Category
-function populateSubcategoryDropdown(category) {
-  const select = document.getElementById('filter-subcategory');
-  if (!select) return;
-  
-  select.innerHTML = '<option value="">All Subcategories</option>';
-  
-  let subcategories = [];
+function getSubcategoriesForCategory(category) {
   if (category === 'Vocabulary') {
-    subcategories = ['Academic Vocabulary', 'Advanced Vocabulary', 'Essential IELTS Vocabulary'];
+    return ['Academic Vocabulary', 'Advanced Vocabulary', 'Essential IELTS Vocabulary'];
   } else if (category === 'Synonyms') {
-    subcategories = ['Common IELTS Synonyms', 'Writing Task 2 Synonyms'];
+    return ['Common IELTS Synonyms', 'Writing Task 2 Synonyms'];
   } else if (category === 'Idioms & Phrases') {
-    subcategories = ['Common IELTS Idioms', 'Essential Idioms', 'IELTS Speaking Idioms', 'Phrasal Verbs', 'Speaking Idioms', 'Useful Expressions'];
+    return ['Common IELTS Idioms', 'Essential Idioms', 'IELTS Speaking Idioms', 'Phrasal Verbs', 'Speaking Idioms', 'Useful Expressions'];
   } else if (category === 'Topic-Based Vocabulary') {
-    subcategories = ['Education', 'Environment', 'Technology', 'Health', 'Business', 'Government', 'Society', 'Science', 'Media', 'Culture', 'Crime', 'Transportation'];
+    return ['Education', 'Environment', 'Technology', 'Health', 'Business', 'Government', 'Society', 'Science', 'Media', 'Culture', 'Crime', 'Transportation'];
   } else {
-    subcategories = [
+    return [
       'Academic Vocabulary', 'Advanced Vocabulary', 'Essential IELTS Vocabulary',
       'Common IELTS Synonyms', 'Writing Task 2 Synonyms',
       'Common IELTS Idioms', 'Essential Idioms', 'IELTS Speaking Idioms', 'Phrasal Verbs', 'Speaking Idioms', 'Useful Expressions',
       'Education', 'Environment', 'Technology', 'Health', 'Business', 'Government', 'Society', 'Science', 'Media', 'Culture', 'Crime', 'Transportation'
     ];
   }
-  
-  subcategories.forEach(sub => {
+}
+
+function populateDropdown(selectId, items, emptyLabel) {
+  const select = document.getElementById(selectId);
+  if (!select) return;
+  select.innerHTML = `<option value="">${emptyLabel}</option>`;
+  items.forEach(item => {
     const opt = document.createElement('option');
-    opt.value = sub;
-    opt.textContent = sub;
+    opt.value = item;
+    opt.textContent = item;
     select.appendChild(opt);
   });
-  
-  select.value = state.filters.subcategory;
+}
+
+function populateSubcategoryDropdown(category) {
+  populateDropdown('filter-subcategory', getSubcategoriesForCategory(category), 'All Topics');
+  const select = document.getElementById('filter-subcategory');
+  if (select) select.value = state.filters.subcategory;
 }
 
 function initFilters() {
   populateSubcategoryDropdown('');
 }
 
-// Reset Alphabet Navigation
 function resetLetterFilter() {
   state.filters.letter = '';
   const container = document.getElementById('alphabet-scroller');
   if (container) {
-    container.querySelectorAll('.alphabet-letter').forEach(l => {
+    container.querySelectorAll('.alpha-letter').forEach(l => {
       l.classList.remove('active');
       if (l.dataset.letter === '') l.classList.add('active');
     });
   }
 }
 
-// Attach general listeners
 function initEventListeners() {
   const searchInput = document.getElementById('search-vocab');
+  const debouncedRender = debounce(() => applyFiltersAndRender(), 200);
   if (searchInput) {
     searchInput.addEventListener('input', (e) => {
       state.filters.search = e.target.value;
-      applyFiltersAndRender();
+      debouncedRender();
     });
   }
-  
+
   const diffSelect = document.getElementById('filter-difficulty');
   if (diffSelect) {
     diffSelect.addEventListener('change', (e) => {
@@ -256,7 +255,7 @@ function initEventListeners() {
       applyFiltersAndRender();
     });
   }
-  
+
   const subcatSelect = document.getElementById('filter-subcategory');
   if (subcatSelect) {
     subcatSelect.addEventListener('change', (e) => {
@@ -264,7 +263,7 @@ function initEventListeners() {
       applyFiltersAndRender();
     });
   }
-  
+
   const sortSelect = document.getElementById('sort-vocab');
   if (sortSelect) {
     sortSelect.addEventListener('change', (e) => {
@@ -272,83 +271,73 @@ function initEventListeners() {
       applyFiltersAndRender();
     });
   }
-  
-  const gridToggle = document.getElementById('btn-view-grid');
-  const listToggle = document.getElementById('btn-view-list');
-  
-  if (gridToggle && listToggle) {
-    gridToggle.addEventListener('click', () => {
-      gridToggle.classList.add('active');
-      listToggle.classList.remove('active');
-      state.viewMode = 'grid';
-      document.getElementById('cards-grid').classList.remove('list-view');
-    });
-    
-    listToggle.addEventListener('click', () => {
-      listToggle.classList.add('active');
-      gridToggle.classList.remove('active');
-      state.viewMode = 'list';
-      document.getElementById('cards-grid').classList.add('list-view');
-    });
-  }
-  
+
   const themeToggle = document.getElementById('theme-toggle');
   if (themeToggle) {
     themeToggle.addEventListener('click', toggleTheme);
   }
-  
-  const menuToggle = document.getElementById('mobile-menu-toggle');
-  const sidebar = document.querySelector('.sidebar');
-  if (menuToggle && sidebar) {
-    menuToggle.addEventListener('click', () => {
-      sidebar.classList.toggle('active');
-    });
-    
-    document.addEventListener('click', (e) => {
-      if (!sidebar.contains(e.target) && !menuToggle.contains(e.target) && sidebar.classList.contains('active')) {
-        sidebar.classList.remove('active');
-      }
-    });
-  }
-  
+
   const practiceBtn = document.getElementById('btn-practice');
   if (practiceBtn) {
     practiceBtn.addEventListener('click', startPracticeMode);
   }
-  
+
   const addWordBtn = document.getElementById('btn-add-word');
   if (addWordBtn) {
-    addWordBtn.addEventListener('click', openAddWordModal);
+    addWordBtn.addEventListener('click', openAddWordPanel);
   }
-  
+
   const addWordForm = document.getElementById('add-word-form');
   if (addWordForm) {
     addWordForm.addEventListener('submit', handleAddWord);
   }
+
+  const panelClose = document.getElementById('panel-close');
+  if (panelClose) {
+    panelClose.addEventListener('click', closeAddWordPanel);
+  }
+
+  const inputCat = document.getElementById('input-category');
+  if (inputCat) {
+    inputCat.addEventListener('change', () => {
+      populateDropdown('input-subcategory', getSubcategoriesForCategory(inputCat.value), 'None');
+    });
+  }
+
+  const practiceClose = document.getElementById('practice-close');
+  if (practiceClose) {
+    practiceClose.addEventListener('click', closePracticeMode);
+  }
+
+  const panelOverlay = document.getElementById('add-word-panel');
+  if (panelOverlay) {
+    panelOverlay.addEventListener('click', (e) => {
+      if (e.target === panelOverlay) closeAddWordPanel();
+    });
+  }
 }
 
-// core data filter, sort, and render engine
 function applyFiltersAndRender() {
   state.visibleCount = 60;
-  
+
   const { search, category, subcategory, difficulty, letter, showOnly } = state.filters;
   const query = search.toLowerCase().trim();
-  
+
   state.filteredWords = state.words.filter(w => {
     const wordLower = w.word.toLowerCase();
-    
-    const matchQuery = !query || 
-      wordLower.includes(query) || 
+
+    const matchQuery = !query ||
+      wordLower.includes(query) ||
       w.meaning.toLowerCase().includes(query) ||
       (w.example && w.example.toLowerCase().includes(query)) ||
       (w.ielts_example && w.ielts_example.toLowerCase().includes(query)) ||
       (w.synonyms && w.synonyms.some(s => s.toLowerCase().includes(query)));
-      
+
     const matchCategory = !category || w.category === category;
     const matchSubcategory = !subcategory || w.subcategory === subcategory;
     const matchDiff = !difficulty || w.difficulty === difficulty;
     const matchLetter = !letter || wordLower.startsWith(letter.toLowerCase());
-    
+
     let matchState = true;
     if (showOnly === 'bookmarks') {
       matchState = state.bookmarks.has(wordLower);
@@ -357,157 +346,159 @@ function applyFiltersAndRender() {
     } else if (showOnly === 'unmastered') {
       matchState = !state.mastered.has(wordLower);
     }
-    
+
     return matchQuery && matchCategory && matchSubcategory && matchDiff && matchLetter && matchState;
   });
-  
+
   sortFilteredData();
   renderCards();
   updateResultHeader();
 }
 
-// Sort Helper
 function sortFilteredData() {
   const method = state.sorting;
   state.filteredWords.sort((a, b) => {
     const wordA = a.word.toLowerCase();
     const wordB = b.word.toLowerCase();
-    
-    if (method === 'alpha-asc') {
-      return wordA.localeCompare(wordB);
-    } else if (method === 'alpha-desc') {
-      return wordB.localeCompare(wordA);
-    } else if (method === 'difficulty-asc') {
-      const diffWeight = { 'Basic': 1, 'Intermediate': 2, 'Advanced': 3 };
-      const diffDiff = diffWeight[a.difficulty] - diffWeight[b.difficulty];
-      return diffDiff === 0 ? wordA.localeCompare(wordB) : diffDiff;
-    } else if (method === 'difficulty-desc') {
-      const diffWeight = { 'Basic': 1, 'Intermediate': 2, 'Advanced': 3 };
-      const diffDiff = diffWeight[b.difficulty] - diffWeight[a.difficulty];
-      return diffDiff === 0 ? wordA.localeCompare(wordB) : diffDiff;
+
+    if (method === 'alpha-asc') return wordA.localeCompare(wordB);
+    if (method === 'alpha-desc') return wordB.localeCompare(wordA);
+
+    const diffWeight = { 'Basic': 1, 'Intermediate': 2, 'Advanced': 3 };
+    if (method === 'difficulty-asc') {
+      const d = diffWeight[a.difficulty] - diffWeight[b.difficulty];
+      return d === 0 ? wordA.localeCompare(wordB) : d;
+    }
+    if (method === 'difficulty-desc') {
+      const d = diffWeight[b.difficulty] - diffWeight[a.difficulty];
+      return d === 0 ? wordA.localeCompare(wordB) : d;
     }
     return 0;
   });
 }
 
-// Update Result Header text details
 function updateResultHeader() {
   const total = state.filteredWords.length;
-  const text = `Showing ${total} of ${state.words.length} Vocabulary Items`;
-  document.getElementById('stat-showing-count').textContent = text;
-  
+  document.getElementById('stat-showing-count').textContent = `Showing ${total} of ${state.words.length}`;
+
   const practiceBtn = document.getElementById('btn-practice');
   if (practiceBtn) {
     practiceBtn.disabled = total === 0;
-    practiceBtn.style.opacity = total === 0 ? '0.5' : '1';
+    practiceBtn.style.opacity = total === 0 ? '0.4' : '1';
   }
 }
 
-// Render the grid/list cards
+function showLoading(loading) {
+  const grid = document.getElementById('cards-grid');
+  if (!grid) return;
+  if (loading) {
+    grid.innerHTML = '<div class="loading-grid">'
+      + '<div class="shimmer-card"></div><div class="shimmer-card"></div><div class="shimmer-card"></div>'
+      + '</div>';
+  } else {
+    grid.innerHTML = '';
+  }
+}
+
 function renderCards() {
   const container = document.getElementById('cards-grid');
   if (!container) return;
-  
+
   if (state.filteredWords.length === 0) {
     container.innerHTML = `
       <div class="empty-state">
         <span class="empty-icon">🔍</span>
         <h3>No results found</h3>
-        <p>Try adjusting your filters or search terms to find what you're looking for.</p>
+        <p>Try adjusting your filters or search terms.</p>
       </div>
     `;
     return;
   }
-  
+
   const visibleWords = state.filteredWords.slice(0, state.visibleCount);
-  
+
   let cardsHTML = visibleWords.map((wordObj) => {
     const wordLower = wordObj.word.toLowerCase();
     const isBookmarked = state.bookmarks.has(wordLower) ? 'bookmarked' : '';
     const isMastered = state.mastered.has(wordLower) ? 'mastered' : '';
     const diffClass = wordObj.difficulty.toLowerCase();
-    
-    const synonymsHTML = wordObj.synonyms && wordObj.synonyms.length > 0 
+
+    const synHTML = wordObj.synonyms && wordObj.synonyms.length > 0
       ? `
-        <div class="detail-section">
-          <span class="detail-title">Synonyms</span>
-          <div class="synonyms-tag-group">
-            ${wordObj.synonyms.map(s => `<span class="synonym-tag" onclick="searchSynonym(event, '${s}')">${s}</span>`).join('')}
+        <div class="detail-block">
+          <span class="detail-block-label">Synonyms</span>
+          <div class="syn-tags">
+            ${wordObj.synonyms.map(s => `<span class="syn-tag" onclick="searchSynonym(event, '${s}')">${s}</span>`).join('')}
           </div>
         </div>
       ` : '';
-      
-    const exampleHTML = wordObj.example 
+
+    const exHTML = wordObj.example
       ? `
-        <div class="detail-section">
-          <span class="detail-title">General Example</span>
-          <p class="example-sentence">"${wordObj.example}"</p>
+        <div class="detail-block">
+          <span class="detail-block-label">Example</span>
+          <p class="example-text">"${wordObj.example}"</p>
         </div>
       ` : '';
-      
-    const ieltsExampleHTML = wordObj.ielts_example 
+
+    const ieltsHTML = wordObj.ielts_example
       ? `
-        <div class="detail-section">
-          <span class="detail-title">IELTS Context Example</span>
-          <div class="ielts-example-box">
-            <p class="ielts-example-sentence">"${wordObj.ielts_example}"</p>
+        <div class="detail-block">
+          <span class="detail-block-label">IELTS Context</span>
+          <div class="ielts-block">
+            <p class="ielts-text">"${wordObj.ielts_example}"</p>
           </div>
         </div>
       ` : '';
-      
+
     return `
       <div class="vocab-card" onclick="toggleCardOpen(this)" data-word="${wordObj.word}">
-        <div class="card-header-row">
-          <div class="card-title-group">
+        <div class="card-head">
+          <div class="card-word-row">
+            <span class="diff-dot ${diffClass}"></span>
             <span class="card-word">${wordObj.word}</span>
-            <button class="btn-audio" onclick="playAudio(event, '${wordObj.word}')" title="Listen Pronunciation">🔊</button>
+            <button class="audio-trigger" onclick="playAudio(event, '${wordObj.word}')" title="Listen">🔊</button>
           </div>
-          <div class="card-badges">
-            <span class="badge-difficulty ${diffClass}">${wordObj.difficulty}</span>
-            <span class="badge-subcategory">${wordObj.subcategory}</span>
-          </div>
+          <span class="card-sub">${wordObj.subcategory}</span>
         </div>
-        <div class="card-meaning">${wordObj.meaning}</div>
-        
-        <div class="card-details-expand">
-          ${synonymsHTML}
-          ${exampleHTML}
-          ${ieltsExampleHTML}
+        <p class="card-meaning">${wordObj.meaning}</p>
+        <div class="card-details">
+          ${synHTML}
+          ${exHTML}
+          ${ieltsHTML}
         </div>
-        
-        <div class="card-actions-row">
-          <button class="btn-card-action ${isBookmarked}" onclick="toggleBookmark(event, '${wordObj.word}')" title="Bookmark Word">
-            ★
-          </button>
-          <button class="btn-card-action ${isMastered}" onclick="toggleMastery(event, '${wordObj.word}')" title="Mark as Mastered">
-            ✓
-          </button>
+        <div class="card-actions">
+          <button class="card-action-btn ${isBookmarked}" onclick="toggleBookmark(event, '${wordObj.word}')" title="Bookmark">★</button>
+          <button class="card-action-btn ${isMastered}" onclick="toggleMastery(event, '${wordObj.word}')" title="Mark mastered">✓</button>
         </div>
       </div>
     `;
   }).join('');
-  
+
   if (state.filteredWords.length > state.visibleCount) {
     cardsHTML += `
-      <div class="load-more-container" style="grid-column: 1 / -1; display: flex; justify-content: center; padding: 25px 0 10px 0;">
-        <button id="btn-load-more" class="btn-primary" onclick="loadMoreCards(event)" style="padding: 12px 30px; border-radius: 8px; font-weight: 600; cursor: pointer; transition: all 0.2s ease;">
-          Load More (+60 items)
-        </button>
+      <div class="load-more-wrap">
+        <button id="btn-load-more" class="btn-primary" onclick="loadMoreCards(event)">Load more (+${state.visibleCount} items)</button>
       </div>
     `;
   }
-  
+
+  if (state._firstRender) {
+    container.classList.add('animate');
+    state._firstRender = false;
+  }
   container.innerHTML = cardsHTML;
 }
 
-// Load more action
 function loadMoreCards(event) {
   if (event) event.stopPropagation();
   state.visibleCount += 60;
+  const grid = document.getElementById('cards-grid');
+  grid.classList.add('animate');
   renderCards();
+  requestAnimationFrame(() => setTimeout(() => grid.classList.remove('animate'), 800));
 }
 
-// Click on Synonym Tag searches that word
 function searchSynonym(event, synonym) {
   event.stopPropagation();
   const searchInput = document.getElementById('search-vocab');
@@ -518,104 +509,194 @@ function searchSynonym(event, synonym) {
     state.filters.subcategory = '';
     state.filters.difficulty = '';
     resetLetterFilter();
-    
-    const sidebarItems = document.querySelectorAll('.sidebar-menu .menu-item');
-    sidebarItems.forEach(el => el.classList.remove('active'));
-    document.querySelector('[data-category=""]').classList.add('active');
+
+    document.querySelectorAll('.cat-tab').forEach(t => t.classList.remove('active'));
+    const allTab = document.querySelector('.cat-tab[data-category=""]');
+    if (allTab) allTab.classList.add('active');
     populateSubcategoryDropdown('');
-    
+
     applyFiltersAndRender();
   }
 }
 
-// Expand Card Details
 function toggleCardOpen(cardElement) {
-  cardElement.classList.toggle('open');
+  const existing = document.querySelector('.card-modal-overlay');
+  if (existing) existing.remove();
+
+  const word = cardElement.dataset.word;
+  const wordObj = state.filteredWords.find(w => w.word.toLowerCase() === word.toLowerCase());
+  if (!wordObj) return;
+
+  const wordLower = wordObj.word.toLowerCase();
+  const isBookmarked = state.bookmarks.has(wordLower) ? 'bookmarked' : '';
+  const isMastered = state.mastered.has(wordLower) ? 'mastered' : '';
+  const diffClass = wordObj.difficulty.toLowerCase();
+
+  const synHTML = wordObj.synonyms && wordObj.synonyms.length > 0
+    ? `<div class="detail-block">
+      <span class="detail-block-label">Synonyms</span>
+      <div class="syn-tags">
+        ${wordObj.synonyms.map(s => `<span class="syn-tag" onclick="searchSynonym(event, '${s}')">${s}</span>`).join('')}
+      </div>
+    </div>` : '';
+
+  const exHTML = wordObj.example
+    ? `<div class="detail-block">
+      <span class="detail-block-label">Example</span>
+      <p class="example-text">"${wordObj.example}"</p>
+    </div>` : '';
+
+  const ieltsHTML = wordObj.ielts_example
+    ? `<div class="detail-block" style="margin-bottom:0">
+      <span class="detail-block-label">IELTS Context</span>
+      <div class="ielts-block">
+        <p class="ielts-text">"${wordObj.ielts_example}"</p>
+      </div>
+    </div>` : '';
+
+  const modal = document.createElement('div');
+  modal.className = 'card-modal-overlay';
+  modal.innerHTML = `
+    <div class="card-modal">
+      <button class="modal-close-btn" onclick="closeCardModal(event)">✕</button>
+      <div class="card-head" style="padding:0">
+        <div class="card-word-row">
+          <span class="diff-dot ${diffClass}"></span>
+          <span class="card-word">${wordObj.word}</span>
+          <button class="audio-trigger" onclick="playAudio(event, '${wordObj.word}')" title="Listen">🔊</button>
+        </div>
+        <span class="card-sub">${wordObj.subcategory}</span>
+      </div>
+      <p class="card-meaning" style="-webkit-line-clamp:unset;font-size:15px">${wordObj.meaning}</p>
+      ${synHTML}
+      ${exHTML}
+      ${ieltsHTML}
+      <div class="card-actions" style="margin-top:16px;padding-top:12px;border-top:1px solid var(--border)">
+        <button class="card-action-btn ${isBookmarked}" onclick="toggleBookmark(event, '${wordObj.word}');closeCardModal(event)" title="Bookmark">★</button>
+        <button class="card-action-btn ${isMastered}" onclick="toggleMastery(event, '${wordObj.word}');closeCardModal(event)" title="Mark mastered">✓</button>
+      </div>
+    </div>`;
+
+  modal.addEventListener('click', function (e) {
+    if (e.target === this) closeCardModal(e);
+  });
+
+  document.body.appendChild(modal);
+  document.body.style.overflow = 'hidden';
+  requestAnimationFrame(() => modal.classList.add('visible'));
 }
 
-// Audio Pronunciation Engine
+function closeCardModal(event) {
+  if (event) event.stopPropagation();
+  const modal = document.querySelector('.card-modal-overlay');
+  if (!modal) return;
+  modal.classList.remove('visible');
+  modal.addEventListener('transitionend', () => {
+    if (document.body.contains(modal)) { modal.remove(); document.body.style.overflow = ''; }
+  }, { once: true });
+  setTimeout(() => {
+    if (document.body.contains(modal)) { modal.remove(); document.body.style.overflow = ''; }
+  }, 250);
+}
+
 function playAudio(event, word) {
   if (event) event.stopPropagation();
-  
   if ('speechSynthesis' in window) {
     window.speechSynthesis.cancel();
-    
     const utterance = new SpeechSynthesisUtterance(word);
     utterance.lang = 'en-US';
-    
     const voices = window.speechSynthesis.getVoices();
     const usVoice = voices.find(v => v.lang === 'en-US' && v.name.includes('Google')) ||
-                    voices.find(v => v.lang.startsWith('en-US')) ||
-                    voices.find(v => v.lang.startsWith('en'));
-                    
+      voices.find(v => v.lang.startsWith('en-US')) ||
+      voices.find(v => v.lang.startsWith('en'));
     if (usVoice) utterance.voice = usVoice;
-    
     utterance.rate = 0.9;
     window.speechSynthesis.speak(utterance);
-  } else {
-    console.warn("Text-to-speech is not supported on this browser.");
   }
 }
 
-// Toggle Bookmark state
 function toggleBookmark(event, word) {
   event.stopPropagation();
   const wordLower = word.toLowerCase();
-  
-  if (state.bookmarks.has(wordLower)) {
+  const wasBookmarked = state.bookmarks.has(wordLower);
+
+  if (wasBookmarked) {
     state.bookmarks.delete(wordLower);
   } else {
     state.bookmarks.add(wordLower);
   }
-  
+
   saveUserData();
-  updateMenuCounts();
-  applyFiltersAndRender();
+  document.getElementById('count-bookmarks').textContent = state.bookmarks.size;
+
+  if (state.filters.showOnly === 'bookmarks' && wasBookmarked) {
+    applyFiltersAndRender();
+    return;
+  }
+
+  event.currentTarget.classList.toggle('bookmarked');
+  const gridCard = document.querySelector(`.vocab-card[data-word="${word}"]`);
+  if (gridCard) {
+    const btn = gridCard.querySelector('.card-action-btn');
+    if (btn && btn !== event.currentTarget) btn.classList.toggle('bookmarked');
+  }
 }
 
-// Toggle Mastery status
 function toggleMastery(event, word) {
   event.stopPropagation();
   const wordLower = word.toLowerCase();
-  
-  if (state.mastered.has(wordLower)) {
+  const wasMastered = state.mastered.has(wordLower);
+
+  if (wasMastered) {
     state.mastered.delete(wordLower);
   } else {
     state.mastered.add(wordLower);
   }
-  
+
   saveUserData();
-  initStats();
-  applyFiltersAndRender();
+
+  const pct = state.words.length > 0 ? Math.round((state.mastered.size / state.words.length) * 100) : 0;
+  const fill = document.getElementById('progress-chip-fill');
+  if (fill) fill.style.width = `${pct}%`;
+  const text = document.getElementById('progress-chip-text');
+  if (text) text.textContent = `${pct}% mastered`;
+
+  if ((state.filters.showOnly === 'mastered' && wasMastered) ||
+      (state.filters.showOnly === 'unmastered' && !wasMastered)) {
+    applyFiltersAndRender();
+    return;
+  }
+
+  event.currentTarget.classList.toggle('mastered');
+  const gridCard = document.querySelector(`.vocab-card[data-word="${word}"]`);
+  if (gridCard) {
+    const btn = gridCard.querySelector('.card-action-btn');
+    if (btn && btn !== event.currentTarget) btn.classList.toggle('mastered');
+  }
 }
 
-// Flashcard Practice Mode Logic
 function startPracticeMode() {
   if (state.filteredWords.length === 0) return;
-  
+
   state.flashcards.queue = [...state.filteredWords];
   state.flashcards.queue.sort(() => Math.random() - 0.5);
-  
   state.flashcards.currentIndex = 0;
   state.flashcards.isFlipped = false;
-  
+
   renderFlashcard();
-  
-  const modal = document.getElementById('practice-modal');
-  if (modal) modal.classList.add('active');
+  const overlay = document.getElementById('practice-overlay');
+  if (overlay) overlay.classList.add('active');
 }
 
 function closePracticeMode() {
-  const modal = document.getElementById('practice-modal');
-  if (modal) modal.classList.remove('active');
+  const overlay = document.getElementById('practice-overlay');
+  if (overlay) overlay.classList.remove('active');
 }
 
 function flipFlashcard() {
   state.flashcards.isFlipped = !state.flashcards.isFlipped;
-  const cardElement = document.getElementById('practice-card');
-  if (cardElement) {
-    cardElement.classList.toggle('flipped', state.flashcards.isFlipped);
-  }
+  const card = document.getElementById('practice-card');
+  if (card) card.classList.toggle('flipped', state.flashcards.isFlipped);
 }
 
 function renderFlashcard() {
@@ -623,53 +704,51 @@ function renderFlashcard() {
   if (currentIndex >= queue.length) {
     const front = document.getElementById('flashcard-front-content');
     const back = document.getElementById('flashcard-back-content');
-    
     front.innerHTML = `
-      <div class="flashcard-word">🎉 Session Complete!</div>
-      <p class="flashcard-prompt">You reviewed ${queue.length} ${queue.length === 1 ? 'word' : 'words'}</p>
+      <div class="flashcard-word" style="font-size:28px">🎉 Done!</div>
+      <p class="flashcard-hint">${queue.length} ${queue.length === 1 ? 'word' : 'words'} reviewed</p>
     `;
-    back.innerHTML = `
-      <div class="flashcard-definition">Great work! Continue practicing to reinforce your learning.</div>
-    `;
-    
+    back.innerHTML = `<p class="flashcard-def">Great work! Keep practicing.</p>`;
     document.getElementById('btn-practice-master').style.display = 'none';
     document.getElementById('btn-practice-next').textContent = 'Restart';
     return;
   }
-  
+
   const wordObj = queue[currentIndex];
   const front = document.getElementById('flashcard-front-content');
   const back = document.getElementById('flashcard-back-content');
   const indexDisplay = document.getElementById('flashcard-index-display');
-  
+
   state.flashcards.isFlipped = false;
-  const cardElement = document.getElementById('practice-card');
-  if (cardElement) cardElement.classList.remove('flipped');
-  
+  const card = document.getElementById('practice-card');
+  if (card) card.classList.remove('flipped');
+
   front.innerHTML = `
     <div class="flashcard-word">${wordObj.word}</div>
-    <span class="badge-difficulty ${wordObj.difficulty.toLowerCase()}" style="margin-top: 10px">${wordObj.difficulty}</span>
-    <p class="flashcard-prompt">Tap to reveal meaning</p>
-    <button class="btn-audio" style="margin-top: 12px" onclick="playAudio(event, '${wordObj.word}')">🔊</button>
+    <span class="flashcard-hint">Tap to reveal</span>
+    <button class="audio-trigger" onclick="playAudio(event, '${wordObj.word}')">🔊</button>
   `;
-  
-  const synHTML = wordObj.synonyms && wordObj.synonyms.length > 0 
-    ? `<div style="margin-top: 8px; font-size: 13px; color: var(--text-secondary)"><strong>Alternatives:</strong> ${wordObj.synonyms.join(', ')}</div>` 
+
+  const synHTML = wordObj.synonyms && wordObj.synonyms.length > 0
+    ? `<div class="flashcard-syn"><strong>Alternatives:</strong> ${wordObj.synonyms.join(', ')}</div>`
     : '';
   const exHTML = wordObj.example || wordObj.ielts_example
-    ? `<p class="flashcard-example">"${wordObj.example || wordObj.ielts_example}"</p>`
+    ? `<p class="flashcard-ex">"${wordObj.example || wordObj.ielts_example}"</p>`
     : '';
-    
+
   back.innerHTML = `
-    <div class="flashcard-definition">${wordObj.meaning}</div>
+    <p class="flashcard-def">${wordObj.meaning}</p>
     ${synHTML}
     ${exHTML}
   `;
-  
+
   indexDisplay.textContent = `${currentIndex + 1} / ${queue.length}`;
-  
   document.getElementById('btn-practice-master').style.display = 'flex';
-  document.getElementById('btn-practice-next').textContent = 'Next ➔';
+  document.getElementById('btn-practice-next').textContent = 'Next →';
+
+  const pct = ((currentIndex + 1) / queue.length) * 100;
+  const fill = document.getElementById('practice-progress-fill');
+  if (fill) fill.style.width = `${pct}%`;
 }
 
 function handlePracticeMaster() {
@@ -677,11 +756,9 @@ function handlePracticeMaster() {
   if (currentIndex < queue.length) {
     const wordObj = queue[currentIndex];
     state.mastered.add(wordObj.word.toLowerCase());
-    
     saveUserData();
     initStats();
     applyFiltersAndRender();
-    
     state.flashcards.currentIndex++;
     renderFlashcard();
   }
@@ -697,26 +774,31 @@ function handlePracticeNext() {
   }
 }
 
-// Add Word Modal Functions
-function openAddWordModal() {
-  const modal = document.getElementById('add-word-modal');
-  if (modal) {
-    modal.style.display = 'flex';
+function openAddWordPanel() {
+  const panel = document.getElementById('add-word-panel');
+  if (panel) {
+    panel.classList.add('active');
+    populateDropdown('input-subcategory', getSubcategoriesForCategory(document.getElementById('input-category').value), 'None');
     document.getElementById('input-word').focus();
   }
 }
 
-function closeAddWordModal() {
-  const modal = document.getElementById('add-word-modal');
-  if (modal) {
-    modal.style.display = 'none';
-    document.getElementById('add-word-form').reset();
-  }
+function closeAddWordPanel() {
+  const panel = document.getElementById('add-word-panel');
+  if (!panel || panel.classList.contains('closing')) return;
+  panel.classList.add('closing');
+  setTimeout(() => {
+    panel.classList.remove('active', 'closing');
+    const form = document.getElementById('add-word-form');
+    form.reset();
+    form.classList.remove('was-validated');
+  }, 260);
 }
 
 async function handleAddWord(event) {
   event.preventDefault();
-  
+  event.target.classList.add('was-validated');
+
   const word = document.getElementById('input-word').value.trim();
   const meaning = document.getElementById('input-meaning').value.trim();
   const synonymsInput = document.getElementById('input-synonyms').value.trim();
@@ -725,13 +807,11 @@ async function handleAddWord(event) {
   const category = document.getElementById('input-category').value;
   const subcategory = document.getElementById('input-subcategory').value.trim();
   const difficulty = document.getElementById('input-difficulty').value;
-  
-  // Parse synonyms (comma-separated)
-  const synonyms = synonymsInput 
+
+  const synonyms = synonymsInput
     ? synonymsInput.split(',').map(s => s.trim()).filter(s => s.length > 0)
     : [];
-  
-  // Create word object
+
   const newWord = {
     word,
     meaning,
@@ -742,37 +822,29 @@ async function handleAddWord(event) {
     subcategory: subcategory || null,
     difficulty
   };
-  
+
   try {
-    // Add to Supabase
     const { data, error } = await db
       .from('vocabulary')
       .insert([newWord])
       .select();
-    
+
     if (error) {
       console.error('Error adding word:', error);
-      alert('Failed to add word. Please try again.');
+      toast('Failed to add word. Please try again.', 'error');
       return;
     }
-    
-    // Add to local state
+
     if (data && data.length > 0) {
       state.words.push(data[0]);
-      
-      // Close modal and reset form
-      closeAddWordModal();
-      
-      // Refresh the display
+      closeAddWordPanel();
       initStats();
       updateMenuCounts();
       applyFiltersAndRender();
-      
-      // Show success message
-      alert(`✅ Successfully added "${word}"!`);
+      toast(`Successfully added "${word}"!`, 'success');
     }
   } catch (err) {
     console.error('Error adding word:', err);
-    alert('An error occurred. Please try again.');
+    toast('An error occurred. Please try again.', 'error');
   }
 }
