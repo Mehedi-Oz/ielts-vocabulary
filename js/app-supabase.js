@@ -55,6 +55,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   initFilters();
   initStats();
   initAlphabetScroller();
+  initCustomSelects();
   initEventListeners();
   applyFiltersAndRender();
 });
@@ -138,6 +139,97 @@ function updateProgressBar() {
   if (text) text.textContent = `${pct}% mastered`;
 }
 
+function initCustomSelects() {
+  document.querySelectorAll('select').forEach(initCustomSelect);
+}
+
+function initCustomSelect(select) {
+  if (select.dataset.customSelect === 'true') return;
+  select.dataset.customSelect = 'true';
+
+  const wrapper = document.createElement('div');
+  wrapper.className = 'custom-select' + (select.classList.contains('panel-select') ? ' panel-select-wrapper' : '');
+
+  select.parentNode.insertBefore(wrapper, select);
+  wrapper.appendChild(select);
+
+  const trigger = document.createElement('button');
+  trigger.type = 'button';
+  trigger.className = 'custom-select-trigger';
+  trigger.innerHTML = `<span class="value">${select.options[select.selectedIndex]?.textContent || select.options[0]?.textContent || ''}</span><span class="arrow">▾</span>`;
+
+  const dropdown = document.createElement('div');
+  dropdown.className = 'custom-select-options';
+
+  function buildOptions() {
+    dropdown.innerHTML = '';
+    Array.from(select.options).forEach((opt, i) => {
+      const el = document.createElement('div');
+      el.className = 'custom-select-option' + (opt.selected ? ' selected' : '');
+      el.textContent = opt.textContent;
+      el.dataset.index = i;
+      el.addEventListener('click', (e) => {
+        e.stopPropagation();
+        select.selectedIndex = i;
+        trigger.querySelector('.value').textContent = opt.textContent;
+        dropdown.querySelectorAll('.custom-select-option').forEach(o => o.classList.remove('selected'));
+        el.classList.add('selected');
+        closeDropdown();
+        select.dispatchEvent(new Event('change', { bubbles: true }));
+      });
+      dropdown.appendChild(el);
+    });
+  }
+
+  buildOptions();
+
+  let dropdownOpen = false;
+
+  function openDropdown() {
+    dropdown.classList.remove('upward');
+    dropdown.classList.add('open');
+    trigger.querySelector('.arrow').classList.add('open');
+    dropdownOpen = true;
+    const rect = dropdown.getBoundingClientRect();
+    if (rect.bottom > window.innerHeight) {
+      dropdown.classList.add('upward');
+    }
+    document.addEventListener('click', closeOutside, true);
+  }
+
+  function closeDropdown() {
+    dropdown.classList.remove('open', 'upward');
+    trigger.querySelector('.arrow').classList.remove('open');
+    dropdownOpen = false;
+    document.removeEventListener('click', closeOutside, true);
+  }
+
+  function closeOutside(e) {
+    if (!wrapper.contains(e.target)) closeDropdown();
+  }
+
+  trigger.addEventListener('click', () => {
+    if (dropdownOpen) {
+      closeDropdown();
+    } else {
+      openDropdown();
+    }
+  });
+
+  trigger.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape') closeDropdown();
+    if (e.key === 'Enter' || e.key === ' ') {
+      e.preventDefault();
+      trigger.click();
+    }
+  });
+
+  wrapper.appendChild(trigger);
+  wrapper.appendChild(dropdown);
+
+  select.style.display = 'none';
+}
+
 function initAlphabetScroller() {
   const container = document.getElementById('alphabet-scroller');
   if (!container) return;
@@ -215,12 +307,48 @@ function populateDropdown(selectId, items, emptyLabel) {
     opt.textContent = item;
     select.appendChild(opt);
   });
+  syncCustomSelect(select);
+}
+
+function syncCustomSelect(select) {
+  if (select.dataset.customSelect !== 'true') return;
+  const wrapper = select.closest('.custom-select');
+  if (!wrapper) return;
+  const triggerText = wrapper.querySelector('.custom-select-trigger .value');
+  const dropdown = wrapper.querySelector('.custom-select-options');
+  if (!dropdown) return;
+
+  dropdown.innerHTML = '';
+  Array.from(select.options).forEach((opt, i) => {
+    const el = document.createElement('div');
+    el.className = 'custom-select-option' + (opt.selected ? ' selected' : '');
+    el.textContent = opt.textContent;
+    el.dataset.index = i;
+    el.addEventListener('click', (e) => {
+      e.stopPropagation();
+      select.selectedIndex = i;
+      wrapper.querySelector('.custom-select-trigger .value').textContent = opt.textContent;
+      dropdown.querySelectorAll('.custom-select-option').forEach(o => o.classList.remove('selected'));
+      el.classList.add('selected');
+      dropdown.classList.remove('open');
+      wrapper.querySelector('.custom-select-trigger .arrow')?.classList.remove('open');
+      select.dispatchEvent(new Event('change', { bubbles: true }));
+    });
+    dropdown.appendChild(el);
+  });
+
+  if (triggerText) {
+    triggerText.textContent = select.options[select.selectedIndex]?.textContent || '';
+  }
 }
 
 function populateSubcategoryDropdown(category) {
   populateDropdown('filter-subcategory', getSubcategoriesForCategory(category), 'All Topics');
   const select = document.getElementById('filter-subcategory');
-  if (select) select.value = state.filters.subcategory;
+  if (select) {
+    select.value = state.filters.subcategory;
+    syncCustomSelect(select);
+  }
 }
 
 function initFilters() {
@@ -778,7 +906,10 @@ function openAddWordPanel() {
   const panel = document.getElementById('add-word-panel');
   if (panel) {
     panel.classList.add('active');
+    document.body.style.overflow = 'hidden';
     populateDropdown('input-subcategory', getSubcategoriesForCategory(document.getElementById('input-category').value), 'None');
+    syncCustomSelect(document.getElementById('input-category'));
+    syncCustomSelect(document.getElementById('input-difficulty'));
     document.getElementById('input-word').focus();
   }
 }
@@ -789,6 +920,7 @@ function closeAddWordPanel() {
   panel.classList.add('closing');
   setTimeout(() => {
     panel.classList.remove('active', 'closing');
+    document.body.style.overflow = '';
     const form = document.getElementById('add-word-form');
     form.reset();
     form.classList.remove('was-validated');
